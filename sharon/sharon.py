@@ -22,9 +22,7 @@ sharon.py
 
 import asyncio
 import logging
-from datetime import time as dtime
 
-import pytz
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -42,15 +40,13 @@ from sharon_config import (
     MAX_REPORTS_PER_SCAN,
 )
 from sharon_fetch import scan_all_sources, load_intel, check_stale_sources
-from sharon_brain import classify_item, write_report, answer_question
+from sharon_brain import classify_item, write_report, answer_question, small_talk
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger("sharon")
-
-TAIPEI_TZ = pytz.timezone("Asia/Taipei")
 
 # 全域記住老闆的 chat id（推播要用）。優先用環境變數，沒有就等第一則訊息學起來。
 OWNER_CHAT_ID = int(SHARON_OWNER_CHAT_ID) if SHARON_OWNER_CHAT_ID else None
@@ -180,7 +176,7 @@ def _pick_relevant_intel(question, intel, limit=8):
 
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """收到老闆的文字訊息：當成提問，撈情報、請 Claude 回答。"""
+    """收到老闆的文字訊息：先判斷是閒聊還是問情報，分開處理。"""
     global OWNER_CHAT_ID
 
     chat_id = update.effective_chat.id
@@ -194,12 +190,31 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
-    # 撈相關情報 → 回答（Claude 呼叫丟到背景線程，不卡訊息收發）
-    await update.message.reply_text("讓我查一下手上的情報……")
-    intel = await asyncio.to_thread(load_intel)
-    relevant = _pick_relevant_intel(text, intel)
-    answer = await asyncio.to_thread(answer_question, text, relevant)
-    await update.message.reply_text(answer)
+    # 判斷這句是不是在問 AI 情報。判斷標準：有沒有提到任何一家公司／模型，
+    # 或有沒有情報相關的關鍵字。沒有的話就當閒聊，自然回一句、不查情報庫。
+    if _looks_like_intel_question(text):
+        await update.message.reply_text("讓我查一下手上的情報……")
+        intel = await asyncio.to_thread(load_intel)
+        relevant = _pick_relevant_intel(text, intel)
+        answer = await asyncio.to_thread(answer_question, text, relevant)
+        await update.message.reply_text(answer)
+    else:
+        reply = await asyncio.to_thread(small_talk, text)
+        await update.message.reply_text(reply)
+
+
+# 判斷一句話是不是在問 AI 情報（提到公司／模型，或含情報關鍵字就算）
+_INTEL_HINTS = [
+    "openai", "google", "gemini", "claude", "anthropic", "deepseek",
+    "qwen", "kimi", "glm", "meta", "llama", "grok", "gpt", "mistral",
+    "模型", "api", "發表", "上線", "降價", "價格", "功能", "版本",
+    "agent", "串接", "影像", "圖片", "新聞", "情報", "消息",
+]
+
+
+def _looks_like_intel_question(text):
+    t = text.lower()
+    return any(hint in t for hint in _INTEL_HINTS)
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
