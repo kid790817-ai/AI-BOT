@@ -13,6 +13,47 @@
 | **Sharon** 📡 | AI 情報警報器 | [sharon](https://github.com/kid790817-ai/sharon) | Railway | ✅ 上線中 |
 | **Winnie** 📈 | 投資學習助手 | [winnie](https://github.com/kid790817-ai/winnie) | Railway | ✅ 上線中 |
 
+## 群聊模組
+
+六隻 bot 共用一個群聊頻道，人類發話時各自骰機率決定要不要回，可以互相接話。
+
+### 機制
+
+- 人類發話 → 開窗口，每隻 bot 骰 50% 決定是否參與
+- 第一次回覆後，每則新訊息 20% 機率再回
+- 第二次回覆後，5%
+- 第三次後不再回
+- 窗口 60 秒沒人講話自動關閉
+- 只有人類訊息能開窗口，bot 訊息不會開新窗口
+- 回覆前隨機延遲 2～8 秒，模擬打字
+
+### 每隻 bot 的群聊個性
+
+| Bot | 群聊角色 |
+|-----|---------|
+| Koda | 穩穩的、話少但到位、偶爾冷幽默、會扯回健康 |
+| Karina | 節奏快、愛操心、會 cue 別人、氣氛推動者 |
+| Mary | 安靜但有在看、碰到感興趣的會突然話多、書呆子式幽默 |
+| Sharon | 反應快、講話直、愛吐槽科技圈、什麼都知道的氣場 |
+| Winnie | 嘴、大姐氣場、毒蛇但在乎、不用 emoji |
+| Claire | 最菜、怯怯的但會小反駁、偶爾歪到 SEO 角度、天然可愛 |
+
+### 技術實作
+
+- 共用模組：`group_chat.py`（每隻 bot 的 repo 根目錄各一份，邏輯相同）
+- 人設檔：`group_persona.md`（每隻 bot 各自不同）
+- commands.Bot（Koda、Karina、Mary、Claire）：以 Cog 載入
+- discord.Client（Sharon、Winnie）：import handler 後在 on_message 呼叫
+
+### 環境變數（Railway）
+
+| 變數 | 說明 |
+|------|------|
+| `GROUP_CHANNEL_ID` | 群聊頻道 ID |
+| `GROUP_AI_API_KEY` | AI API key（可共用 bot 本身的） |
+| `GROUP_AI_MODEL` | 模型名稱 |
+| `GROUP_AI_BASE_URL` | （選用）DeepSeek bot 才需要 |
+
 ## 各 Bot 詳細資訊
 
 ### Koda 🐾 — 健康管理夥伴
@@ -64,9 +105,11 @@
 - **部署**：Railway（GitHub 連結自動部署）
 - **AI**：Anthropic API（Koda、Karina、Claire、Sharon）、DeepSeek（Mary、Winnie）
 - **儲存**：Railway Volume + SQLite
+- **群聊模組**：`group_chat.py`（共用邏輯）+ `group_persona.md`（各自人設）
 
 ## 更新紀錄
 
 | 日期 | 異動 |
 |------|------|
-| 2026-05-30 | 建立追蹤總覽 |
+| 2025-05-30 | 新增群聊模組：六隻 bot 共用群聊頻道，機率遞減機制（50%→20%→5%→0%），各自有群聊人設。同時修正 Sharon 的 bot 過濾 bug、Winnie 新增 message_content intent |
+| 2025-05-30 | 建立追蹤總覽 |
